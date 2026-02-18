@@ -1,49 +1,59 @@
-from Pages.base_page import BasePage
-from selenium import webdriver
+from selenium import webdriver  
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common import TimeoutException
+from selenium.common.exceptions import TimeoutException
+from Pages.base_page import BasePage
+from Locators.careerPageLocators import CareerPageLocators
 
 
 class CareerPage(BasePage):
-    def __init__(self, driver: webdriver, config: dict):
+    def __init__(self, driver: webdriver):
         super().__init__(driver)
-        self._config = config
+        self.URL = "https://kariery.pk.edu.pl/#/offers"
+        self._offers = []
 
-    def get_offers(self):
+    def open(self):
         self._driver.maximize_window()
-        self._driver.get(self._config["URL"])
-
-        all_offers = []
-
-        accept_cookies_button = self.wait.until(
-            EC.visibility_of_element_located((By.XPATH, self._config["ACCEPT_COOKIES_BUTTON_XPATH"]))
-        )
+        self._driver.get(self.URL)
+        accept_cookies_button = self._wait.until(EC.visibility_of_element_located(CareerPageLocators.ACCEPT_COOKIES_BUTTON))
         accept_cookies_button.click()
+    
+    def get_offers(self):
+        self._apply_filters()
+        while True:
+            self._scrape_current_page_offers()
+            next_page = self._wait.until(EC.presence_of_element_located(CareerPageLocators.NEXT_PAGE))
+            if next_page.get_attribute("class") == "page-item disabled":
+                break
+            self._change_to_next_page(next_page)
 
-        industries_button = self.find((By.XPATH, self._config["INDUSTRIES_BUTTON_XPATH"]))
-        industries_button.click()
+        for offer in self._offers:
+            print(f"Offer: {offer[0]}. Link: {offer[1]}")
 
-        it_label = self.wait.until(
-            EC.visibility_of_element_located((By.XPATH, self._config["IT_LABEL_XPATH"]))
-        )
+    def _apply_filters(self):
+        industries_button = self._find_element(CareerPageLocators.INDUSTRIES_BUTTON)   
+        industries_button.click() 
+        it_label = self._wait.until(EC.visibility_of_element_located(CareerPageLocators.IT_LABEL))     
         it_label.click()
-
-        it_coding_label = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, self._config["IT_CODING_LABEL_XPATH"]))
-        )
+        self._wait_for_reload()
+        it_coding_label = self._wait.until(EC.visibility_of_element_located(CareerPageLocators.IT_CODING_LABEL))
         it_coding_label.click()
+        self._wait_for_reload()
 
-
-        try:
-            loader = self.wait.until(
-                EC.visibility_of_element_located((By.XPATH, self._config["LOADER_XPATH"]))
-            )
+    def _wait_for_reload(self):
+        try: 
+            loader = self._wait.until(EC.visibility_of_element_located(CareerPageLocators.LOADER)) 
+            self._wait.until(EC.staleness_of(loader))       
         except TimeoutException:
             pass
 
-        self.wait.until(EC.staleness_of(loader))
-        all_offers = self._driver.find_elements(By.XPATH, self._config["OFFERS_XPATH"])
+    def _scrape_current_page_offers(self):
+        scraped_offers = self._find_all_elements(CareerPageLocators.OFFERS)
+        for offer in scraped_offers:
+            self._offers.append((offer.text, offer.get_property("href")))
 
-        for offer in all_offers:
-            print(f"Offer: {offer.text}. Link: {offer.get_property("href")}")
+    def _change_to_next_page(self, element):
+        next_page_a = element.find_element(By.XPATH, "./a")
+        self._driver.execute_script("arguments[0].click();", next_page_a)
+        self._wait_for_reload()
+        
