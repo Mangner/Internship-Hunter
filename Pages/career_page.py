@@ -4,7 +4,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from Pages.base_page import BasePage
 from Locators.careerPageLocators import CareerPageLocators
-
+import time
 
 class CareerPage(BasePage):
     def __init__(self, driver: webdriver):
@@ -28,7 +28,7 @@ class CareerPage(BasePage):
             self._change_to_next_page(next_page)
 
         for offer in self._offers:
-            print(f"Offer: {offer[0]}. Link: {offer[1]}")
+            print(self._get_offer_details(offer))
 
     def _apply_filters(self):
         industries_button = self._find_element(CareerPageLocators.INDUSTRIES_BUTTON)   
@@ -50,10 +50,24 @@ class CareerPage(BasePage):
     def _scrape_current_page_offers(self):
         scraped_offers = self._find_all_elements(CareerPageLocators.OFFERS)
         for offer in scraped_offers:
-            self._offers.append((offer.text, offer.get_property("href")))
+            self._offers.append(offer.get_property("href"))
 
     def _change_to_next_page(self, element):
         next_page_a = element.find_element(By.XPATH, "./a")
         self._driver.execute_script("arguments[0].click();", next_page_a)
         self._wait_for_reload()
         
+    def _get_offer_details(self, url):
+        self._driver.get(url)
+        offer_name = self._wait.until(
+            lambda d: d.find_element(*CareerPageLocators.OFFER_NAME).text.strip() or False
+        )
+        add_date = self._wait.until(
+            EC.visibility_of_element_located(CareerPageLocators.ADD_DATE)
+        ).text
+        expiration_date = self._wait.until(
+            EC.visibility_of_element_located(CareerPageLocators.EXPIRATION_DATE)
+        ).text
+        self._driver.get("https://kariery.pk.edu.pl/#/offers")
+        self._wait_for_reload()
+        return (offer_name, add_date, expiration_date, url)
