@@ -10,7 +10,7 @@ class CareerPage(BasePage):
     def __init__(self, driver: webdriver):
         super().__init__(driver)
         self.URL = "https://kariery.pk.edu.pl/#/offers"
-        self._offers = []
+        self._preprocessed_offers = []
 
     def open(self):
         self._driver.maximize_window()
@@ -27,8 +27,10 @@ class CareerPage(BasePage):
                 break
             self._change_to_next_page(next_page)
 
-        for offer in self._offers:
-            print(self._get_offer_details(offer))
+        final_offers = []
+        for offer in self._preprocessed_offers:
+            final_offers.append(self._get_offer_details(offer))
+        return final_offers
 
     def _apply_filters(self):
         industries_button = self._find_element(CareerPageLocators.INDUSTRIES_BUTTON)   
@@ -50,7 +52,7 @@ class CareerPage(BasePage):
     def _scrape_current_page_offers(self):
         scraped_offers = self._find_all_elements(CareerPageLocators.OFFERS)
         for offer in scraped_offers:
-            self._offers.append(offer.get_property("href"))
+            self._preprocessed_offers.append(offer.get_property("href"))
 
     def _change_to_next_page(self, element):
         next_page_a = element.find_element(By.XPATH, "./a")
