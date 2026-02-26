@@ -1,12 +1,18 @@
+from datetime import date
 from Models.offer import Offer
+from DTOs.rawOffer import RawOffer
 
 
 class OfferParser:
 
-    def parse_all(self, offers: list[list[str, str, str, str]]) -> list[Offer]:
-        parsed_offers = []
-        for offer in offers:
-            new_offer = Offer(offer_name=offer[0], add_date=offer[1], exp_date=offer[2], href=offer[3])
-            parsed_offers.append(new_offer)
-        return parsed_offers
+    def parse_all(self, offers: list[RawOffer]) -> list[Offer]:
+        return [self._to_model(offer) for offer in offers]
+
+    def _to_model(self, raw: RawOffer) -> Offer:
+        return Offer(
+            offer_name=raw.name,
+            add_date=date.fromisoformat(raw.add_date),
+            exp_date=date.fromisoformat(raw.exp_date),
+            href=raw.href,
+        )
         

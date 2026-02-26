@@ -4,7 +4,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from Pages.base_page import BasePage
 from Locators.careerPageLocators import CareerPageLocators
-import time
+from DTOs.rawOffer import RawOffer
 
 class CareerPage(BasePage):
     def __init__(self, driver: webdriver):
@@ -18,7 +18,7 @@ class CareerPage(BasePage):
         accept_cookies_button = self._wait.until(EC.visibility_of_element_located(CareerPageLocators.ACCEPT_COOKIES_BUTTON))
         accept_cookies_button.click()
     
-    def get_offers(self):
+    def get_offers(self) -> list[RawOffer]:
         self._apply_filters()
         while True:
             self._scrape_current_page_offers()
@@ -72,4 +72,4 @@ class CareerPage(BasePage):
         ).text
         self._driver.get("https://kariery.pk.edu.pl/#/offers")
         self._wait_for_reload()
-        return (offer_name, add_date, expiration_date, url)
+        return RawOffer(name=offer_name, add_date=add_date, exp_date=expiration_date, href=url)
