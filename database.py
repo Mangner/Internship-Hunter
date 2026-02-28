@@ -1,6 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from Models.base import Base
+from Models import offer  
+from Models import subscription 
 
 
 class Database:

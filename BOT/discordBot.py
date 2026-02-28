@@ -1,34 +1,36 @@
 import discord
 from discord.ext import commands
-import logging
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-token = os.getenv('DISCORD_TOKEN')
-
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-
-bot = commands.Bot(command_prefix='/', intents=intents)
 
 
-@bot.event
-async def on_ready():
-    print(f"We are ready to go in, {bot.user.name}")
+class DiscordBot(commands.Bot):
+    def __init__(self, db_url: str):
+        intents = discord.Intents.default()
+        intents.message_content = True
+        intents.members = True
+        super().__init__(command_prefix='!', intents=intents, help_command=None)
+        self.db_url = db_url
 
+    async def on_ready(self):
+        print(f"We are ready to go in, {self.user.name}")
 
-@bot.event
-async def on_message(message):
-    if message.author == bot.user:
-        return 
-    
-    if "eliza" in message.content.lower():
-        await message.delete()
-        await message.channel.send(f"{message.author.mention} pomyliłeś, przecież to")
+    async def setup_hook(self):
+        await self.load_extension("BOT.cogs.offer_cog")
+        await self.tree.sync()
 
-    await bot.process_commands(message)
+    async def on_guild_join(self, guild: discord.Guild):
+        channel = guild.system_channel
+        if channel is None:
+            for text_channel in guild.text_channels:
+                permissions = text_channel.permissions_for(guild.me)
+                if permissions.send_messages:
+                    channel = text_channel
+                    break
 
-bot.run(token, log_handler=handler, log_level=logging.DEBUG)
+        if channel is None:
+            return
+
+        await channel.send(
+            "Hello! I am a bot that notifies you about new job and internship offers "
+            "from the Career Office of Cracow University of Technology. "
+            "Type /help to see available commands."
+        )

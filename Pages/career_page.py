@@ -19,9 +19,32 @@ class CareerPage(BasePage):
         accept_cookies_button.click()
     
     def get_offers(self) -> list[RawOffer]:
+        self._preprocessed_offers = []
         self._apply_filters()
         while True:
             self._scrape_current_page_offers()
+            next_page = self._wait.until(EC.presence_of_element_located(CareerPageLocators.NEXT_PAGE))
+            if next_page.get_attribute("class") == "page-item disabled":
+                break
+            self._change_to_next_page(next_page)
+
+        final_offers = []
+        for offer in self._preprocessed_offers:
+            final_offers.append(self._get_offer_details(offer))
+        return final_offers
+
+    def get_new_offers(self, exists_by_href) -> list[RawOffer]:
+        self._preprocessed_offers = []
+        self._apply_filters()
+
+        while True:
+            scraped_offers = self._find_all_elements(CareerPageLocators.OFFERS)
+            for offer in scraped_offers:
+                href = offer.get_property("href")
+                if exists_by_href(href):
+                    continue
+                self._preprocessed_offers.append(href)
+
             next_page = self._wait.until(EC.presence_of_element_located(CareerPageLocators.NEXT_PAGE))
             if next_page.get_attribute("class") == "page-item disabled":
                 break

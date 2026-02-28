@@ -1,25 +1,19 @@
-from selenium import webdriver
-from Pages.career_page import CareerPage
-from Parsers.offerParser import OfferParser
-from Repository.offerRepository import OfferRepository
-from Services.offerService import OfferService
-from database import Database
+from BOT.discordBot import DiscordBot
+import logging
+from dotenv import load_dotenv
+import os
 
-# 1. Baza danych
-db = Database("sqlite:///offers.db")
-db.create_tables()
-session = db.get_session()
 
-# 2. Scraping — CareerPage zwraca list[RawOffer] (DTO)
-page = CareerPage(webdriver.Chrome())
-page.open()
-raw_offers = page.get_offers()
+def main():
 
-# 3. Service — parsuje DTO → ORM i zapisuje do bazy (przez Repository)
-repository = OfferRepository(session)
-parser = OfferParser()
-service = OfferService(repository, parser)
-saved = service.save_new_offers(raw_offers)
+    load_dotenv()
+    TOKEN = os.getenv('DISCORD_TOKEN')
+    DB_URL = os.getenv('DATABASE_CONNECTION_STRING')
+    handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+    bot = DiscordBot(db_url=DB_URL)
+    bot.run(TOKEN, log_handler=handler, log_level=logging.DEBUG)
 
-print(f"Zapisano {len(saved)} nowych ofert.")
-session.close()
+
+if __name__ == '__main__':
+    main()
+
