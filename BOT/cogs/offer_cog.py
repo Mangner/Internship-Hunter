@@ -14,10 +14,11 @@ from Services.offerService import OfferService
 
 
 class OfferCog(commands.Cog):
-    def __init__(self, bot: commands.Bot, db_url: str):
+    def __init__(self, bot: commands.Bot, db_url: str, start_loop: bool = True):
         self._bot = bot
         self._db_url = db_url
-        self._poll_new_offers.start()
+        if start_loop:
+            self._poll_new_offers.start()
 
     def cog_unload(self):
         self._poll_new_offers.cancel()
@@ -32,6 +33,7 @@ class OfferCog(commands.Cog):
             repository.create_if_missing(channel_id=ctx.channel.id, guild_id=ctx.guild.id if ctx.guild else None)
         finally:
             session.close()
+            db.dispose()
 
         await ctx.send("Ten kanal zostal zarejestrowany do powiadomien o nowych ofertach.")
 
@@ -45,6 +47,7 @@ class OfferCog(commands.Cog):
             removed = repository.delete_by_channel_id(channel_id=ctx.channel.id)
         finally:
             session.close()
+            db.dispose()
 
         if removed:
             await ctx.send("Ten kanal zostal wypisany z powiadomien.")
@@ -61,6 +64,7 @@ class OfferCog(commands.Cog):
             offers = repository.get_all()
         finally:
             session.close()
+            db.dispose()
 
         if not offers:
             await ctx.send("Brak ofert w bazie.")
@@ -107,6 +111,9 @@ class OfferCog(commands.Cog):
         if not saved_offers:
             return
 
+        await self._notify_subscribers(saved_offers)
+
+    async def _notify_subscribers(self, offers, delay_seconds: int = 5):
         db = Database(self._db_url)
         db.create_tables()
         session = db.get_session()
@@ -115,22 +122,33 @@ class OfferCog(commands.Cog):
             subscriptions = subscription_repo.get_all()
         finally:
             session.close()
+            db.dispose()
+
+        print(f"[notify] Found {len(subscriptions)} subscription(s), {len(offers)} offer(s) to send.")
 
         for subscription in subscriptions:
+            print(f"[notify] Looking up channel {subscription.channel_id}...")
             channel = self._bot.get_channel(subscription.channel_id)
             if channel is None:
+                print(f"[notify] Channel not in cache, fetching from API...")
                 try:
                     channel = await self._bot.fetch_channel(subscription.channel_id)
-                except discord.NotFound:
+                except discord.NotFound as e:
+                    print(f"[notify] Channel {subscription.channel_id} not found: {e.status} {e.text}")
                     continue
-                except discord.Forbidden:
+                except discord.Forbidden as e:
+                    print(f"[notify] No access to channel {subscription.channel_id}: {e.status} {e.text}")
                     continue
-                except discord.HTTPException:
+                except discord.HTTPException as e:
+                    print(f"[notify] HTTP error for channel {subscription.channel_id}: {e.status} {e.text}")
                     continue
 
-            for offer in saved_offers:
+            print(f"[notify] Sending to channel: {channel} ({channel.id})")
+            for offer in offers:
                 await channel.send(f"Nowa oferta: {offer.offer_name}\n{offer.href}")
-                await asyncio.sleep(5)
+                print(f"[notify] Sent: {offer.offer_name}")
+                if delay_seconds:
+                    await asyncio.sleep(delay_seconds)
 
     def _scrape_and_save_new_offers(self):
         db = Database(self._db_url)
@@ -145,9 +163,13 @@ class OfferCog(commands.Cog):
             page.open()
             raw_offers = page.get_new_offers(repository.exists_by_href)
             saved = service.save_new_offers(raw_offers)
+            for offer in saved:
+                session.refresh(offer)
+                session.expunge(offer)
             return saved
         finally:
             session.close()
+            db.dispose()
             driver.quit()
 
 
