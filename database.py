@@ -15,4 +15,7 @@ class Database:
 
     def get_session(self) -> Session:
         return self._session_local()
+
+    def dispose(self):
+        self._engine.dispose()
         
